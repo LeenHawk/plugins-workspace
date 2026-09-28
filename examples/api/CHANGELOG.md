@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.47]
+
+### Dependencies
+
+- Upgraded to `opener-js@2.7.0`
+- Upgraded to `updater-js@2.13.1`
+
 ## [2.0.46]
 
 ### Dependencies
