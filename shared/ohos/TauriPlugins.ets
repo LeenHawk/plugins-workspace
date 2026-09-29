@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 import common from '@ohos.app.ability.common';
+import { BusinessError } from '@ohos.base';
 import { NativeModule, NativePlugin } from './NativePlugin';
 import { Clipboard } from './plugins/Clipboard';
 import { Dialog } from './plugins/Dialog';
@@ -42,7 +43,8 @@ export class TauriPlugins {
       if (this.active) this.native.tauriOhosPluginResponse(request.id, true, response);
     } catch (error) {
       if (!this.active) return;
-      const response: NativeError = { code: 'OHOS_NATIVE_ERROR', message: String(error) };
+      const nativeError = error as BusinessError;
+      const response: NativeError = { code: typeof nativeError.code === 'number' ? String(nativeError.code) : 'OHOS_NATIVE_ERROR', message: nativeError.message || String(error) };
       this.native.tauriOhosPluginResponse(request.id, false, JSON.stringify(response));
     }
   }
