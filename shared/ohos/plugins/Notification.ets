@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 import common from '@ohos.app.ability.common';
 import notificationManager from '@ohos.notificationManager';
+import notification from '@ohos.notification';
 import { BusinessError } from '@ohos.base';
 import { NativePlugin } from '../NativePlugin';
 
@@ -28,7 +29,7 @@ export class Notification implements NativePlugin {
       case 'requestPermissions': {
         try { await notificationManager.requestEnableNotification(this.context); }
         catch (error) {
-          if ((error as BusinessError).code !== 1600004) throw error;
+          if ((error as BusinessError).code !== 1600004) throw error as Error;
         }
         const result: PermissionResponse = { permissionState: await notificationManager.isNotificationEnabled() ? 'granted' : 'denied' };
         return JSON.stringify(result);
@@ -38,14 +39,14 @@ export class Notification implements NativePlugin {
         if (request.schedule || request.actionTypeId || request.sound || request.silent || (request.attachments?.length ?? 0) > 0) {
           throw new Error('Scheduled notifications, actions, custom sounds and attachments are not supported by this OHOS backend');
         }
-        const notification: notificationManager.NotificationRequest = {
+        const nativeRequest: notificationManager.NotificationRequest = {
           id: request.id,
           content: {
-            contentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
+            contentType: notification.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
             normal: { title: request.title ?? '', text: request.body ?? '', additionalText: request.summary ?? '' }
           }
         };
-        await notificationManager.publish(notification);
+        await notificationManager.publish(nativeRequest);
         return JSON.stringify(request.id);
       }
       case 'removeActive': {

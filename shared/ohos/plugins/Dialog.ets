@@ -41,16 +41,17 @@ export class Dialog implements NativePlugin {
     if (!this.active) throw new Error('Ability has been destroyed');
     if (command === 'showMessageDialog') {
       const request = JSON.parse(payload) as MessageRequest;
-      const buttons: promptAction.Button[] = [];
-      if (request.okButtonLabel) buttons.push({ text: request.okButtonLabel, color: '#007DFF' });
-      if (request.noButtonLabel) buttons.push({ text: request.noButtonLabel, color: '#182431' });
-      if (request.cancelButtonLabel) buttons.push({ text: request.cancelButtonLabel, color: '#182431' });
+      const labels: string[] = [];
+      if (request.okButtonLabel) labels.push(request.okButtonLabel);
+      if (request.noButtonLabel) labels.push(request.noButtonLabel);
+      if (request.cancelButtonLabel) labels.push(request.cancelButtonLabel);
+      const buttons: promptAction.Button[] = labels.map((text: string, index: number): promptAction.Button => { return { text, color: index === 0 ? '#007DFF' : '#182431' }; });
       if (buttons.length === 0) throw new Error('A native dialog must have a button');
       const win = await window.getLastWindow(this.context);
       const result = await win.getUIContext().getPromptAction().showDialog({ title: request.title, message: request.message, buttons });
       if (!this.active) throw new Error('Ability has been destroyed');
       // Return the actual selected label, preserving Tauri's custom button contract.
-      const response: MessageResponse = { value: result.index >= 0 && result.index < buttons.length ? buttons[result.index].text : 'Cancel' };
+      const response: MessageResponse = { value: result.index >= 0 && result.index < labels.length ? labels[result.index] : 'Cancel' };
       return JSON.stringify(response);
     }
     const request = JSON.parse(payload) as FileRequest;

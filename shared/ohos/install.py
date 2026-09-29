@@ -35,12 +35,22 @@ ability = entry / 'src/main/ets/entryability/EntryAbility.ets'
 text = ability.read_text()
 if 'TauriPlugins' in text:
     raise ValueError('Native glue already installed; generate a fresh OHOS project')
-text = f"import native from '{module_name}'\nimport {{ TauriPlugins }} from '../tauri-plugins/TauriPlugins'\n" + text
-text = text.replace('export default class EntryAbility extends RustAbility {', 'export default class EntryAbility extends RustAbility {\n  private tauriPlugins?: TauriPlugins;')
+text = f"import native from '{module_name}'\nimport {{ TauriPlugins }} from '../tauri-plugins/TauriPlugins'\nimport {{ NativeModule }} from '../tauri-plugins/NativePlugin'\n" + text
+adapter = """class TauriNativeModule implements NativeModule {
+  tauriOhosPluginInitialize(callback: (request: string) => void, files: string, cache: string, temp: string): void {
+    native.tauriOhosPluginInitialize(callback, files, cache, temp);
+  }
+  tauriOhosPluginResponse(id: number, success: boolean, payload: string): void {
+    native.tauriOhosPluginResponse(id, success, payload);
+  }
+  tauriOhosPluginClose(): void { native.tauriOhosPluginClose(); }
+}
+"""
+text = text.replace('export default class EntryAbility extends RustAbility {', adapter + 'export default class EntryAbility extends RustAbility {\n  private tauriPlugins?: TauriPlugins;')
 needle = 'super.onCreate(want, launchParam);'
 if needle not in text:
     raise ValueError('The generated Ability onCreate template changed')
-text = text.replace(needle, 'this.tauriPlugins = new TauriPlugins(this.context, native);\n    await super.onCreate(want, launchParam);')
+text = text.replace(needle, 'this.tauriPlugins = new TauriPlugins(this.context, new TauriNativeModule());\n    await super.onCreate(want, launchParam);')
 end = text.rindex('}')
 text = text[:end]+'''  onDestroy(): void {
     this.tauriPlugins?.close();

@@ -27,7 +27,7 @@ export class Clipboard implements NativePlugin {
           if (access.authResults.length !== 1 || access.authResults[0] !== 0) throw new Error('Clipboard permission denied');
         }
         const data = await board.getData();
-        const result: TextPayload = { plainText: { text: data.toPlainText() } };
+        const result: TextPayload = { plainText: { text: data.getPrimaryText() } };
         return JSON.stringify(result);
       }
       case 'clear':

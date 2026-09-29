@@ -50,3 +50,12 @@ test('an open completing after Ability teardown is rejected and its descriptor i
   files.close();
   assert.deepEqual(calls.closed, [91]);
 });
+
+test('exclusive creation cannot silently overwrite a picked document', async () => {
+  reset();
+  const files = new Files();
+  const uri = 'file://docs/existing.txt';
+  files.grant(uri, true);
+  await assert.rejects(files.invoke('openFile', request(uri, { write: true, createNew: true })), /Exclusive/);
+  assert.equal(calls.opened.length, 0);
+});

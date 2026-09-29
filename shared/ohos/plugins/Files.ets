@@ -46,7 +46,7 @@ export class Files implements NativePlugin {
     if (request.append) mode |= fs.OpenMode.APPEND;
     if (request.truncate) mode |= fs.OpenMode.TRUNC;
     if (request.create || request.createNew) mode |= fs.OpenMode.CREATE;
-    if (request.createNew) mode |= fs.OpenMode.EXCL;
+    if (request.createNew) throw new Error('Exclusive creation is not supported for picker URIs');
     const file = await fs.open(request.uri, mode);
     if (!this.active) {
       fs.closeSync(file);
