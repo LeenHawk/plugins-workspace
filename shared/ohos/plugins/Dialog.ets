@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 import common from '@ohos.app.ability.common';
 import picker from '@ohos.file.picker';
+import fs from '@ohos.file.fs';
+import util from '@ohos.util';
 import window from '@ohos.window';
 import promptAction from '@ohos.promptAction';
 import { NativePlugin } from '../NativePlugin';
@@ -54,22 +56,45 @@ export class Dialog implements NativePlugin {
     const request = JSON.parse(payload) as FileRequest;
     const view = new picker.DocumentViewPicker(this.context);
     if (command === 'showFilePicker') {
-      const options: picker.DocumentSelectOptions = {
-        maxSelectNumber: request.multiple ? 500 : 1,
-        fileSuffixFilters: this.filters(request)
-      };
-      const selected = await view.select(options);
+      let selected: string[];
+      const media = request.pickerMode === 'media' || request.pickerMode === 'image' || request.pickerMode === 'video';
+      if (media) {
+        const options: picker.PhotoSelectOptions = {
+          MIMEType: request.pickerMode === 'image' ? picker.PhotoViewMIMETypes.IMAGE_TYPE :
+            request.pickerMode === 'video' ? picker.PhotoViewMIMETypes.VIDEO_TYPE : picker.PhotoViewMIMETypes.IMAGE_VIDEO_TYPE,
+          maxSelectNumber: request.multiple ? 500 : 1
+        };
+        selected = (await new picker.PhotoViewPicker(this.context).select(options)).photoUris;
+      } else {
+        const options: picker.DocumentSelectOptions = { maxSelectNumber: request.multiple ? 500 : 1 };
+        const filters = this.filters(request);
+        if (filters.length > 0) options.fileSuffixFilters = filters;
+        selected = await view.select(options);
+      }
       if (!this.active) throw new Error('Ability has been destroyed');
       if (selected.length === 0) throw new Error('File selection cancelled');
-      for (const uri of selected) this.files.grant(uri, true);
+      if (request.fileAccessMode === 'copy') {
+        const directory = `${this.context.cacheDir}/tauri-picked-${util.generateRandomUUID()}`;
+        await fs.mkdir(directory);
+        const copied: string[] = [];
+        for (const uri of selected) {
+          const name = decodeURIComponent(uri.slice(uri.lastIndexOf('/') + 1)).split('/').join('_');
+          const source = await fs.open(uri, fs.OpenMode.READ_ONLY);
+          const target = `${directory}/${name}`;
+          try { await fs.copyFile(source.fd, target); } finally { await fs.close(source); }
+          copied.push(target);
+        }
+        selected = copied;
+      } else {
+        for (const uri of selected) this.files.grant(uri, !media);
+      }
       const response: OpenResponse = { files: selected };
       return JSON.stringify(response);
     }
     if (command === 'saveFileDialog') {
-      const options: picker.DocumentSaveOptions = {
-        newFileNames: [request.fileName ?? 'Untitled'],
-        fileSuffixChoices: this.filters(request)
-      };
+      const options: picker.DocumentSaveOptions = { newFileNames: [request.fileName ?? 'Untitled'] };
+      const filters = this.filters(request);
+      if (filters.length > 0) options.fileSuffixChoices = filters;
       const selected = await view.save(options);
       if (!this.active) throw new Error('Ability has been destroyed');
       if (selected.length === 0) throw new Error('File save cancelled');

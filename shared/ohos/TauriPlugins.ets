@@ -23,7 +23,7 @@ export class TauriPlugins {
     this.native = native;
     const files = new Files();
     this.plugins.set('fs', files);
-    this.plugins.set('clipboard-manager', new Clipboard());
+    this.plugins.set('clipboard-manager', new Clipboard(context));
     this.plugins.set('dialog', new Dialog(context, files));
     this.plugins.set('notification', new Notification(context));
     this.plugins.set('opener', new Opener(context));
