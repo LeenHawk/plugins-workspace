@@ -53,7 +53,16 @@ def patch_application(workspace, host, patches):
     manifest = Path(host) / 'Cargo.toml'
     text = manifest.read_text()
     for name, path in patches.items():
-        text = re.sub(rf'^{re.escape(name)} = .*$', f'{name} = {{ path = "{path}" }}', text, flags=re.MULTILINE)
+        def replace_dependency(match):
+            options = tomllib.loads('value = ' + match.group(1))['value']
+            if isinstance(options, str):
+                options = {}
+            for key in ('version', 'path', 'git', 'rev', 'branch', 'tag', 'registry', 'workspace'):
+                options.pop(key, None)
+            options = {'path': str(path), **options}
+            values = ', '.join(f'{key} = {json.dumps(value)}' for key, value in options.items())
+            return name + ' = { ' + values + ' }'
+        text = re.sub(rf'^{re.escape(name)} = (.*)$', replace_dependency, text, flags=re.MULTILINE)
     manifest.write_text(text)
     manifest = Path(workspace) / 'Cargo.toml'
     with manifest.open('a') as output:
