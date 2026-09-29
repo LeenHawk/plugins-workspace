@@ -18,6 +18,10 @@ impl<R: Runtime> Fs<R> {
         match path.into() {
             FilePath::Path(path) => std::fs::OpenOptions::from(options).open(path),
             FilePath::Url(uri) => {
+                if options.mode.is_some() || options.custom_flags.is_some() {
+                    return Err(std::io::Error::new(std::io::ErrorKind::Unsupported,
+                        "Unix permissions and custom flags require a filesystem path, not a picker URI"));
+                }
                 // ArkTS accepts only URIs granted by this Ability's native picker.
                 // Duplicate the descriptor before releasing its ArkTS File owner.
                 let fd: i32 = self.0.run_mobile_plugin("openFile", serde_json::json!({

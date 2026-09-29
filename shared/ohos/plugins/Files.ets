@@ -38,7 +38,11 @@ export class Files implements NativePlugin {
     if (access === 0 || (writes && (access & 2) === 0)) {
       throw new Error('The native picker has not granted the requested URI access');
     }
-    let mode = writes ? (request.read ? fs.OpenMode.READ_WRITE : fs.OpenMode.WRITE_ONLY) : fs.OpenMode.READ_ONLY;
+    const writeAccess = request.write || request.append;
+    if ((!request.read && !writeAccess) || ((request.truncate || request.create || request.createNew) && !writeAccess)) {
+      throw new Error('Invalid file access mode');
+    }
+    let mode = writeAccess ? (request.read ? fs.OpenMode.READ_WRITE : fs.OpenMode.WRITE_ONLY) : fs.OpenMode.READ_ONLY;
     if (request.append) mode |= fs.OpenMode.APPEND;
     if (request.truncate) mode |= fs.OpenMode.TRUNC;
     if (request.create || request.createNew) mode |= fs.OpenMode.CREATE;

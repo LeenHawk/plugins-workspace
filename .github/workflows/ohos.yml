@@ -24,6 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - run: git config --global --add safe.directory "$PWD"
+      - name: Check URI grants and file lifetime boundaries
+        run: |
+          npx --yes esbuild@0.25.10 shared/ohos/plugins/Files.ets --loader:.ets=ts --format=esm --platform=node --outfile=/tmp/ohos-files.mjs
+          OHOS_FILES_TEST_MODULE=/tmp/ohos-files.mjs node --test tests/ohos/files.test.mjs
       - run: python3 shared/ohos/prepare.py /tmp/ohos-plugins-core examples/ohos/src-tauri examples/ohos/src-tauri
       - uses: Swatinem/rust-cache@v2.9.2
         with:
