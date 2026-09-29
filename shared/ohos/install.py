@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 """Install native plugin glue into a freshly generated OHOS application."""
 import json
+import argparse
 from pathlib import Path
 import shutil
 import sys
 import tomllib
 import json5
 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('host')
+parser.add_argument('--without-barcode', action='store_true', help='Omit ScanKit when building for OpenHarmony without Huawei ScanKit')
+args = parser.parse_args()
 source = Path(__file__).resolve().parent
-host = Path(sys.argv[1]).resolve()
+host = Path(args.host).resolve()
 manifest = tomllib.loads((host / 'Cargo.toml').read_text())
 library = manifest.get('lib', {}).get('name', manifest['package']['name'].replace('-', '_'))
 project = host / 'gen/ohos'
 entry = project / 'entry'
 destination = entry / 'src/main/ets/tauri-plugins'
-shutil.copytree(source, destination, ignore=shutil.ignore_patterns('*.py', '*.json', '*.md'), dirs_exist_ok=True)
+ignored = ['*.py', '*.json', '*.md'] + (['Barcode.ets'] if args.without_barcode else [])
+shutil.copytree(source, destination, ignore=shutil.ignore_patterns(*ignored), dirs_exist_ok=True)
+if args.without_barcode:
+    bridge = destination / 'TauriPlugins.ets'
+    text = bridge.read_text().replace("import { Barcode } from './plugins/Barcode';\n", '').replace("    this.plugins.set('barcode-scanner', new Barcode(context));\n", '')
+    bridge.write_text(text)
 module_name = f'lib{library}.so'
 types = entry / 'src/main/cpp/types/tauri-plugins-native'
 types.mkdir(parents=True, exist_ok=True)
@@ -67,6 +77,8 @@ for name, reason, text in [
     ('ohos.permission.CAMERA', 'tauri_camera_reason', 'Scan QR codes and barcodes'),
     ('ohos.permission.READ_PASTEBOARD', 'tauri_clipboard_reason', 'Read text you choose to paste into the application'),
 ]:
+    if args.without_barcode and name == 'ohos.permission.CAMERA':
+        continue
     if not any(p['name'] == name for p in permissions):
         permissions.append({'name': name, 'reason': f'$string:{reason}', 'usedScene': {'abilities': ['EntryAbility'], 'when': 'inuse'}})
     resources['string'].append({'name': reason, 'value': text})

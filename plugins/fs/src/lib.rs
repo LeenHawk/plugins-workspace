@@ -34,14 +34,14 @@ mod commands;
 mod config;
 #[cfg(desktop)]
 mod desktop;
-#[cfg(target_env = "ohos")]
-mod ohos;
 mod error;
 mod file_path;
 #[cfg(target_os = "ios")]
 mod ios;
 #[cfg(target_os = "android")]
 mod models;
+#[cfg(target_env = "ohos")]
+mod ohos;
 mod scope;
 #[cfg(feature = "watch")]
 mod watcher;
