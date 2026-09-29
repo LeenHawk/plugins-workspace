@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Install native plugin glue into a freshly generated OHOS application."""
+import json
+from pathlib import Path
+import shutil
+import sys
+import tomllib
+import json5
+
+source = Path(__file__).resolve().parent
+host = Path(sys.argv[1]).resolve()
+manifest = tomllib.loads((host / 'Cargo.toml').read_text())
+library = manifest.get('lib', {}).get('name', manifest['package']['name'].replace('-', '_'))
+project = host / 'gen/ohos'
+entry = project / 'entry'
+destination = entry / 'src/main/ets/tauri-plugins'
+shutil.copytree(source, destination, ignore=shutil.ignore_patterns('*.py', '*.json', '*.md'), dirs_exist_ok=True)
+module_name = f'lib{library}.so'
+types = entry / 'src/main/cpp/types/tauri-plugins-native'
+types.mkdir(parents=True, exist_ok=True)
+(types / 'oh-package.json5').write_text(json.dumps({'name': module_name, 'version': '1.0.0', 'types': './index.d.ts'}, indent=2)+'\n')
+(types / 'index.d.ts').write_text('''interface NativeModule {
+  tauriOhosPluginInitialize(callback: (request: string) => void, files: string, cache: string, temp: string): void;
+  tauriOhosPluginResponse(id: number, success: boolean, payload: string): void;
+  tauriOhosPluginClose(): void;
+}
+declare const native: NativeModule;
+export default native;
+''')
+package = entry / 'oh-package.json5'
+data = json5.loads(package.read_text())
+data.setdefault('dependencies', {})[module_name] = 'file:./src/main/cpp/types/tauri-plugins-native'
+package.write_text(json.dumps(data, indent=2)+'\n')
+ability = entry / 'src/main/ets/entryability/EntryAbility.ets'
+text = ability.read_text()
+if 'TauriPlugins' in text:
+    raise ValueError('Native glue already installed; generate a fresh OHOS project')
+text = f"import native from '{module_name}'\nimport {{ TauriPlugins }} from '../tauri-plugins/TauriPlugins'\n" + text
+text = text.replace('export default class EntryAbility extends RustAbility {', 'export default class EntryAbility extends RustAbility {\n  private tauriPlugins?: TauriPlugins;')
+needle = 'super.onCreate(want, launchParam);'
+if needle not in text:
+    raise ValueError('The generated Ability onCreate template changed')
+text = text.replace(needle, 'this.tauriPlugins = new TauriPlugins(this.context, native);\n    await super.onCreate(want, launchParam);')
+end = text.rindex('}')
+text = text[:end]+'''  onDestroy(): void {
+    this.tauriPlugins?.close();
+    super.onDestroy();
+  }
+'''+text[end:]
+ability.write_text(text)
+module = entry / 'src/main/module.json5'
+data = json5.loads(module.read_text())
+permissions = data['module'].setdefault('requestPermissions', [])
+strings = entry / 'src/main/resources/base/element/string.json'
+resources = json5.loads(strings.read_text())
+for name, reason, text in [
+    ('ohos.permission.CAMERA', 'tauri_camera_reason', 'Scan QR codes and barcodes'),
+    ('ohos.permission.READ_PASTEBOARD', 'tauri_clipboard_reason', 'Read text you choose to paste into the application'),
+]:
+    if not any(p['name'] == name for p in permissions):
+        permissions.append({'name': name, 'reason': f'$string:{reason}', 'usedScene': {'abilities': ['EntryAbility'], 'when': 'inuse'}})
+    resources['string'].append({'name': reason, 'value': text})
+module.write_text(json.dumps(data, indent=2)+'\n')
+strings.write_text(json.dumps(resources, indent=2)+'\n')
+print(f'Installed native plugin glue into {project}')

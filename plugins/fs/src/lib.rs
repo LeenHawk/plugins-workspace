@@ -34,6 +34,8 @@ mod commands;
 mod config;
 #[cfg(desktop)]
 mod desktop;
+#[cfg(target_env = "ohos")]
+mod ohos;
 mod error;
 mod file_path;
 #[cfg(target_os = "ios")]
@@ -50,6 +52,8 @@ pub use android::Fs;
 pub use desktop::Fs;
 #[cfg(target_os = "ios")]
 pub use ios::Fs;
+#[cfg(target_env = "ohos")]
+pub use ohos::Fs;
 
 pub use error::Error;
 
@@ -605,6 +609,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R, Option<config::Config>> {
             }
             #[cfg(desktop)]
             app.manage(Fs(app.clone()));
+            #[cfg(target_env = "ohos")]
+            app.manage(ohos::init(app, api)?);
 
             app.manage(scope);
             app.manage(SecurityScopedResources::new());
