@@ -5,11 +5,11 @@
   },
   "wry": {
     "repository": "LeenHawk/wry",
-    "revision": "86ebaaa12a758e7a06ebf55b01559ccdcb9979ab"
+    "revision": "b73b44d6bc66ac07fceb4d1f6c4a1a2566806082"
   },
   "ability": {
     "repository": "LeenHawk/openharmony-ability",
-    "revision": "8745735b2ace363892de62b77bdaf0e8ef0b802d"
+    "revision": "1100487ff877131b53bc4693ea140b0a40d73ae3"
   },
   "tao": {
     "repository": "tauri-apps/tao",

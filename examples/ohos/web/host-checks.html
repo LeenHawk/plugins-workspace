@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebView host acceptance</title>
+<style>body{font:16px system-ui;max-width:760px;margin:24px auto;padding:16px}button,input{margin:8px;padding:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<h1>WebView host acceptance</h1>
+<p>Write a storage value, force-stop and restart the app, then read it again. A build passing does not complete these checks.</p>
+<button id="write">Write storage value</button><button id="read">Read storage values</button>
+<button id="bytes">Round-trip 1 MiB binary IPC</button><button id="frames">Check sandbox IPC isolation</button>
+<button id="dialogs">Alert / confirm / prompt</button><button id="external">Open system browser</button>
+<button id="fullscreen">Enter fullscreen</button>
+<p><input id="file" type="file" accept=".png,.json,.jsonl"><input placeholder="Check keyboard avoidance"></p>
+<pre id="output" aria-live="polite"></pre>
+<script>
+const output = document.getElementById('output');
+const log = (value) => { output.textContent += `${typeof value === 'string' ? value : JSON.stringify(value)}\n`; };
+const invoke = window.__TAURI__.core.invoke;
+const key = 'ohos-host-persistence';
+function database() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('ohos-host-acceptance', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('values');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+async function storage(write) {
+  const db = await database();
+  const value = write ? new Date().toISOString() : undefined;
+  if (write) localStorage.setItem(key, value);
+  const stored = await new Promise((resolve, reject) => {
+    const tx = db.transaction('values', write ? 'readwrite' : 'readonly');
+    const request = write ? tx.objectStore('values').put(value, key) : tx.objectStore('values').get(key);
+    tx.oncomplete = () => resolve(write ? value : request.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+  return { localStorage: localStorage.getItem(key), indexedDB: stored };
+}
+async function captureInvokeKey() {
+  const original = window.fetch;
+  let invokeKey;
+  window.fetch = (url, options) => {
+    if (options?.headers) invokeKey = new Headers(options.headers).get('Tauri-Invoke-Key') || invokeKey;
+    return original(url, options);
+  };
+  try { await invoke('host_probe_count'); } finally { window.fetch = original; }
+  if (!invokeKey) throw new Error('Custom protocol was not used; origin test is inconclusive');
+  return invokeKey;
+}
+const actions = {
+  write: () => storage(true),
+  read: () => storage(false),
+  bytes: async () => {
+    const bytes = Uint8Array.from({ length: 1048579 }, (_, index) => index % 251);
+    const response = new Uint8Array(await invoke('host_probe_echo', bytes));
+    if (response.length !== bytes.length || response.some((byte, index) => byte !== bytes[index])) {
+      throw new Error(`Binary IPC mismatch: sent ${bytes.length}, received ${response.length}`);
+    }
+    return `Binary IPC preserved all ${bytes.length} bytes`;
+  },
+  frames: async () => {
+    // Supply a valid key deliberately so this checks frame authorization, not only key secrecy.
+    const invokeKey = await captureInvokeKey();
+    const before = await invoke('host_probe_count');
+    const frame = document.createElement('iframe');
+    frame.sandbox = 'allow-scripts';
+    const callback = window.__TAURI_INTERNALS__.transformCallback(() => log('Unexpected child success'), true);
+    const error = window.__TAURI_INTERNALS__.transformCallback((value) => log({ rejected: value }), true);
+    const url = window.__TAURI_INTERNALS__.convertFileSrc('host_probe_record', 'ipc');
+    const message = { cmd: 'host_probe_record', callback, error, payload: {}, options: {}, __TAURI_INVOKE_KEY__: invokeKey };
+    frame.srcdoc = `<script>
+      parent.postMessage({hostProbe:true, hasInternals:!!window.__TAURI_INTERNALS__, origin:location.origin}, '*');
+      try { window.ipc.postMessage(${JSON.stringify(JSON.stringify(message))}); } catch (error) {}
+      fetch(${JSON.stringify(url)}, {method:'POST',body:'{}',headers:{'Content-Type':'application/json','Tauri-Callback':'${callback}','Tauri-Error':'${error}','Tauri-Invoke-Key':${JSON.stringify(invokeKey)}}}).catch(()=>{});
+    <\/script>`;
+    document.body.appendChild(frame);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const after = await invoke('host_probe_count');
+      if (after !== before) throw new Error('Sandbox frame reached a native command');
+      return 'No child native invocation observed; verify hasInternals=false above';
+    } finally {
+      frame.remove();
+      window.__TAURI_INTERNALS__.unregisterCallback(callback);
+      window.__TAURI_INTERNALS__.unregisterCallback(error);
+    }
+  },
+  dialogs: () => { alert('Native alert'); return { confirm: confirm('Native confirmation'), prompt: prompt('Native text input', 'initial value') }; },
+  external: () => { window.open('https://tauri.app', '_blank'); return 'Check the system browser'; },
+  fullscreen: () => document.documentElement.requestFullscreen(),
+};
+window.addEventListener('message', (event) => { if (event.data?.hostProbe) log(event.data); });
+for (const [name, action] of Object.entries(actions)) {
+  document.getElementById(name).onclick = async () => { try { log(await action()); } catch (error) { log(String(error)); } };
+}
+document.getElementById('file').onchange = async (event) => {
+  try { const file = event.target.files[0]; if (file) log({ file: file.name, bytes: (await file.arrayBuffer()).byteLength }); }
+  catch (error) { log(String(error)); }
+};
+storage(false).then(log).catch((error) => log(String(error)));
+</script>
+</html>
