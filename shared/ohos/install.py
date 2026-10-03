@@ -45,7 +45,7 @@ data.setdefault('dependencies', {})[module_name] = 'file:./src/main/cpp/types/ta
 package.write_text(json.dumps(data, indent=2)+'\n')
 ability_source = Path((host / 'gen/ohos-ability-source').read_text().strip())
 subprocess.run(['bash', 'scripts/pack.sh'], cwd=ability_source, check=True)
-archives = list((ability_source / 'dist').glob('*.har'))
+archives = list(ability_source.glob('*.har'))
 if len(archives) != 1:
     raise ValueError(f'Expected one Ability HAR from pinned sources, got {archives}')
 vendor = project / 'vendor'
