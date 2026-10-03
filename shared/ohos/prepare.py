@@ -11,34 +11,43 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGINS = ('clipboard-manager', 'dialog', 'fs', 'notification', 'opener', 'barcode-scanner')
 
 
-def prepare_sources(destination):
-    baseline = Path(os.environ['OHOS_TAURI_SOURCES'])
-    expected = json.loads((baseline / 'tauri-harmony-pins.json').read_text())
-    pin = json.loads((ROOT / 'shared/ohos/core-pin.json').read_text())
-    core = Path(destination).resolve() / 'tauri'
-    if core.exists():
-        raise ValueError('Use a fresh external source directory for the OHOS overlay')
-    subprocess.run(['git', 'init', str(core)], check=True)
-    subprocess.run(['git', '-C', str(core), 'fetch', '--depth', '1', f"https://github.com/{pin['repository']}.git", pin['revision']], check=True)
-    subprocess.run(['git', '-C', str(core), 'checkout', '--detach', 'FETCH_HEAD'], check=True)
-    for manifest in core.rglob('Cargo.toml'):
-        text = manifest.read_text().replace(
-            'git = "https://github.com/harmony-contrib/openharmony-ability.git"',
-            'git = "https://github.com/harmony-contrib/openharmony-ability.git", rev = "' + expected['ability']['revision'] + '"')
-        manifest.write_text(text)
+def prepare_sources(destination, pins=None):
+    destination = Path(destination).resolve()
+    pins = pins or json.loads((ROOT / 'shared/ohos/runtime-pins.json').read_text())
+    sources = {}
+    for name, pin in pins.items():
+        checkout = destination / name
+        if checkout.exists():
+            raise ValueError(f'Use a fresh external source directory: {checkout}')
+        subprocess.run(['git', 'init', str(checkout)], check=True)
+        subprocess.run(['git', '-C', str(checkout), 'fetch', '--depth', '1',
+                        f"https://github.com/{pin['repository']}.git", pin['revision']], check=True)
+        subprocess.run(['git', '-C', str(checkout), 'checkout', '--detach', 'FETCH_HEAD'], check=True)
+        sources[name] = checkout
+    core = sources['tauri']
+    ability = sources['ability']
+    # One source checkout supplies both the Rust Ability and its packaged ArkTS HAR.
+    for name in ('tauri', 'wry', 'tao'):
+        for manifest in sources[name].rglob('Cargo.toml'):
+            lines = []
+            for line in manifest.read_text().splitlines(True):
+                for package, directory in (('openharmony-ability', 'ability'), ('openharmony-ability-derive', 'derive')):
+                    if line.startswith(package + ' = ') and 'git = ' in line:
+                        line = re.sub(r'git = "[^"]+"(?:, rev = "[^"]+")?',
+                                      f'path = "{ability / "crates" / directory}"', line)
+                lines.append(line)
+            manifest.write_text(''.join(lines))
     manifest = core / 'Cargo.toml'
     text = manifest.read_text()
-    for name in ('wry', 'tao', 'cargo-mobile2'):
-        text = re.sub(rf'^{name} = .*$', f'{name} = {{ path = "{baseline / name}" }}', text, flags=re.MULTILINE)
+    for name in ('wry', 'tao'):
+        text = re.sub(rf'^{name} = .*$', f'{name} = {{ path = "{sources[name]}" }}', text, flags=re.MULTILINE)
     manifest.write_text(text)
-    patches = {}
-    for manifest in (core / 'crates').glob('*/Cargo.toml'):
-        name = tomllib.loads(manifest.read_text()).get('package', {}).get('name', '')
-        if name.startswith('tauri'):
-            patches[name] = manifest.parent
-    for name in ('wry', 'tao', 'cargo-mobile2'):
-        patches[name] = baseline / name
-    # Keep the fork's normal platforms on upstream stable Tauri. This mutation is CI-only.
+    packages = ('tauri', 'tauri-build', 'tauri-codegen', 'tauri-macros', 'tauri-plugin',
+                'tauri-runtime', 'tauri-runtime-wry', 'tauri-utils')
+    patches = {name: core / 'crates' / name for name in packages}
+    patches.update({name: sources[name] for name in ('wry', 'tao')})
+    patches['openharmony-ability'] = ability / 'crates/ability'
+    patches['openharmony-ability-derive'] = ability / 'crates/derive'
     manifest = ROOT / 'Cargo.toml'
     text = manifest.read_text()
     for name in ('tauri', 'tauri-build', 'tauri-plugin', 'tauri-utils'):
@@ -50,6 +59,9 @@ def prepare_sources(destination):
 
 
 def patch_application(workspace, host, patches):
+    generated = Path(host) / 'gen'
+    generated.mkdir(exist_ok=True)
+    (generated / 'ohos-ability-source').write_text(str(patches['openharmony-ability'].parents[1]) + '\n')
     manifest = Path(host) / 'Cargo.toml'
     text = manifest.read_text()
     for name, path in patches.items():
@@ -68,6 +80,8 @@ def patch_application(workspace, host, patches):
     with manifest.open('a') as output:
         output.write('\n[patch.crates-io]\n')
         for name, path in patches.items():
+            if name.startswith('openharmony-ability'):
+                continue
             output.write(f'{name} = {{ path = "{path}" }}\n')
 
 

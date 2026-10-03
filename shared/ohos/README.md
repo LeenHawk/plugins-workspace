@@ -2,7 +2,7 @@
 
 This fork adds OHOS backends for clipboard-manager, dialog, fs, notification,
 opener and barcode-scanner. It uses the core bridge pinned in
-[core-pin.json](core-pin.json). Stable platform dependencies stay unchanged;
+[runtime-pins.json](runtime-pins.json). Stable platform dependencies stay unchanged;
 `prepare.py` applies the experimental dependency overlay only in a disposable
 build checkout.
 
@@ -77,3 +77,16 @@ a pending operation. No device/signing environment was available for this change
 Clipboard reading and camera use follow the platform's permission and signing
 policy. This implementation does not bypass those checks or report success after
 a permission failure.
+
+## WebView baseline
+
+`runtime-pins.json` pins the actual Tauri, Wry, Tao and Ability sources. The Ability
+HAR is packaged from the same checkout as the Rust dependency; applications do
+not download an independently versioned registry HAR. The Ability fork enables
+persistent browser storage, native file inputs/dialogs, external HTTP(S) windows,
+and optional host back navigation. Wry keeps main-frame initialization scripts
+out of child frames and passes ArkWeb frame metadata to IPC.
+
+`install.py --sources-only` copies the HAR, plugin ArkTS and generated native
+module types without changing an application's committed Ability or permissions.
+Device acceptance (including storage across process restarts) is still required.
