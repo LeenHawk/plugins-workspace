@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [build-dependencies]
 tauri-build = "2"
 [dependencies]
-tauri = "2"
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"

@@ -12,7 +12,15 @@
         "label": "main",
         "title": "OHOS plugins"
       }
-    ]
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPCACHE/host-probe-range.bin"
+        ]
+      }
+    }
   },
   "bundle": {
     "active": true,

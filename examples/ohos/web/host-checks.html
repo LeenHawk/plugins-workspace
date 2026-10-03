@@ -9,7 +9,7 @@
 <button id="write">Write storage value</button><button id="read">Read storage values</button>
 <button id="bytes">Round-trip 1 MiB binary IPC</button><button id="frames">Check sandbox IPC isolation</button>
 <button id="dialogs">Alert / confirm / prompt</button><button id="external">Open system browser</button>
-<button id="fullscreen">Enter fullscreen</button>
+<button id="range">Check native media Range</button><button id="fullscreen">Enter fullscreen</button>
 <p><input id="file" type="file" accept=".png,.json,.jsonl"><input placeholder="Check keyboard avoidance"></p>
 <pre id="output" aria-live="polite"></pre>
 <script>
@@ -60,6 +60,16 @@ const actions = {
       throw new Error(`Binary IPC mismatch: sent ${bytes.length}, received ${response.length}`);
     }
     return `Binary IPC preserved all ${bytes.length} bytes`;
+  },
+  range: async () => {
+    const path = await invoke('host_probe_range_file');
+    const response = await fetch(window.__TAURI__.core.convertFileSrc(path), { headers: { Range: 'bytes=17-83' } });
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (response.status !== 206 || response.headers.get('Content-Range') !== 'bytes 17-83/4096' ||
+        bytes.length !== 67 || bytes.some((byte, index) => byte !== (index + 17) % 251)) {
+      throw new Error(`Range mismatch: status ${response.status}, ${bytes.length} bytes`);
+    }
+    return 'Native asset protocol preserved the byte range and 206 response';
   },
   frames: async () => {
     // Supply a valid key deliberately so this checks frame authorization, not only key secrecy.
