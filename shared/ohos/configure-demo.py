@@ -15,12 +15,8 @@ for product in data['app']['products']:
     product['compileSdkVersion'] = '6.0.0(20)'
 profile.write_text(json.dumps(data, indent=2)+'\n')
 p = project / 'entry/hvigorfile.ts'
-s = p.read_text()
-needle = '"--target", target.toString()]'
-if needle not in s:
-    raise ValueError('Upstream release Rust callback template changed')
-s = s.replace('properties.target || "aarch64"', f'properties.target || "{os.environ["TARGET_TRIPLE"].split("-")[0]}"')
-p.write_text(s.replace(needle, '"--target", target.toString(), "--release"]'))
+# CLI owns native compilation, including the target and release profile.
+p.write_text("import { hapTasks } from '@ohos/hvigor-ohos-plugin';\nexport default { system: hapTasks, plugins: [] };\n")
 
 p = project / 'entry/build-profile.json5'
 data = json5.loads(p.read_text())

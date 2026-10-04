@@ -54,7 +54,7 @@ export PATH="$HARMONY_TOOLS_DIR/command-line-tools/tool/node/bin:$PATH"
 (cd examples/ohos/src-tauri && cargo tauri ohos init --ci --skip-targets-install)
 python3 shared/ohos/configure-demo.py
 python3 shared/ohos/install.py examples/ohos/src-tauri
-(cd examples/ohos/src-tauri && cargo tauri ohos build --ci --target aarch64 --ignore-version-mismatches -- --lib)
+(cd examples/ohos/src-tauri && cargo tauri ohos build --ci --target aarch64 -- --lib)
 ```
 
 `prepare.py` clones the pinned core outside the workspace, reuses the image's
@@ -80,7 +80,10 @@ a permission failure.
 
 ## WebView baseline
 
-`runtime-pins.json` pins the actual Tauri, Wry, Tao and Ability sources. The Ability
+`runtime-pins.json` is the standalone sample baseline only. Applications such as
+gproxy and TauriTavern own their pins and pass them to `prepare_sources(destination, pins)`.
+Application version constraints are retained; Cargo rejects incompatible fork versions.
+The pins select the actual Tauri, Wry, Tao and Ability sources. The Ability
 HAR is packaged from the same checkout as the Rust dependency; applications do
 not download an independently versioned registry HAR. The Ability fork enables
 persistent browser storage, native file inputs/dialogs, external HTTP(S) windows,
@@ -88,5 +91,13 @@ and optional host back navigation. Wry keeps main-frame initialization scripts
 out of child frames and passes ArkWeb frame metadata to IPC.
 
 `install.py --sources-only` copies the HAR, plugin ArkTS and generated native
-module types without changing an application's committed Ability or permissions.
+module types without changing an application's `entry/oh-package.json5`, Ability or permissions.
+The application must already declare its native module types and `vendor/ability.har` dependency.
 Device acceptance (including storage across process restarts) is still required.
+
+## Native entry-point dependencies
+
+OHOS applications must directly depend on `napi-ohos = "=1.2.0"` and
+`napi-derive-ohos = "=1.2.0"`, matching the runtime fork. The current N-API
+procedural macros refer to those crate names in generated application code.
+Re-exporting the attribute through Tauri alone does not remove that requirement.

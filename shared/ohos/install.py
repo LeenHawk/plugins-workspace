@@ -39,10 +39,6 @@ types.mkdir(parents=True, exist_ok=True)
 declare const native: NativeModule;
 export default native;
 ''')
-package = entry / 'oh-package.json5'
-data = json5.loads(package.read_text())
-data.setdefault('dependencies', {})[module_name] = 'file:./src/main/cpp/types/tauri-plugins-native'
-package.write_text(json.dumps(data, indent=2)+'\n')
 ability_source = Path((host / 'gen/ohos-ability-source').read_text().strip())
 subprocess.run(['bash', 'scripts/pack.sh'], cwd=ability_source, check=True)
 archives = list(ability_source.glob('*.har'))
@@ -51,11 +47,15 @@ if len(archives) != 1:
 vendor = project / 'vendor'
 vendor.mkdir(exist_ok=True)
 shutil.copyfile(archives[0], vendor / 'ability.har')
-data['dependencies']['@ohos-rs/ability'] = 'file:../vendor/ability.har'
-package.write_text(json.dumps(data, indent=2)+'\n')
 if args.sources_only:
     print(f'Installed pinned HAR and plugin sources into {project}')
     sys.exit(0)
+
+package = entry / 'oh-package.json5'
+data = json5.loads(package.read_text())
+data.setdefault('dependencies', {})[module_name] = 'file:./src/main/cpp/types/tauri-plugins-native'
+data['dependencies']['@ohos-rs/ability'] = 'file:../vendor/ability.har'
+package.write_text(json.dumps(data, indent=2)+'\n')
 
 ability = entry / 'src/main/ets/entryability/EntryAbility.ets'
 text = ability.read_text()
