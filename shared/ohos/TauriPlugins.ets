@@ -20,7 +20,12 @@ export class TauriPlugins {
   private plugins: Map<string, NativePlugin> = new Map();
   private active: boolean = true;
 
-  constructor(context: common.UIAbilityContext, native: NativeModule) {
+  /** Application plugins share the built-in bridge's dispatch and lifetime. */
+  constructor(
+    context: common.UIAbilityContext,
+    native: NativeModule,
+    appPlugins: Map<string, NativePlugin> = new Map<string, NativePlugin>(),
+  ) {
     this.native = native;
     const files = new Files();
     this.plugins.set('fs', files);
@@ -29,6 +34,10 @@ export class TauriPlugins {
     this.plugins.set('notification', new Notification(context));
     this.plugins.set('opener', new Opener(context));
     this.plugins.set('barcode-scanner', new Barcode(context));
+    appPlugins.forEach((plugin: NativePlugin, name: string): void => {
+      if (this.plugins.has(name)) throw new Error(`Native plugin is already registered: ${name}`);
+      this.plugins.set(name, plugin);
+    });
     native.tauriOhosPluginInitialize((request: string): void => {
       void this.invoke(JSON.parse(request) as Request);
     }, context.filesDir, context.cacheDir, context.tempDir);
