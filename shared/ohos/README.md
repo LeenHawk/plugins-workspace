@@ -37,6 +37,21 @@ omit the Rust barcode plugin and pass `--without-barcode` to `install.py`.
 The other five backends use OpenHarmony APIs. This option excludes the ScanKit
 source/import and camera declaration from the generated application.
 
+## Application plugins
+
+Applications can add their own ArkTS plugins to the same bridge:
+
+- Rust registers the plugin with `api.register_ohos_plugin()` and calls it with
+  `run_mobile_plugin_async`. Requests are routed by the Tauri plugin name.
+- ArkTS implements `NativePlugin`. `invoke` receives the command and its JSON
+  payload string and resolves with a JSON string. A thrown error rejects the
+  Rust call. `close` releases native resources.
+- The Ability passes a `Map<string, NativePlugin>` as the third `TauriPlugins`
+  argument, keyed by the Tauri plugin name. Names that collide with a built-in
+  backend are rejected. The bridge closes application plugins with the built-ins.
+- Keep application plugins in application-owned sources, outside
+  `tauri-plugins/`, which `install.py` overwrites.
+
 ## Build the sample
 
 The repository's [OHOS workflow](../../.github/workflows/ohos.yml) uses the public,
