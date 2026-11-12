@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.13.3]
+
+- [`81631888`](https://github.com/tauri-apps/plugins-workspace/commit/81631888e9482d88de5581769c2e03dea1e73222) ([#3658](https://github.com/tauri-apps/plugins-workspace/pull/3658)) Update `minisign-verify` to 0.3, which rejects signatures with a non-canonical Ed25519 `S` value. The `Error::Minisign` variant now wraps `minisign_verify` 0.3's `Error`, and its message reads like "The signature verification failed" instead of the variant name (`InvalidSignature`).
+
+## [2.13.2]
+
+- [`2a9c29e0`](https://github.com/tauri-apps/plugins-workspace/commit/2a9c29e004325db674fd904089749c38f4aac824) ([#3578](https://github.com/tauri-apps/plugins-workspace/pull/3578) by [@alii13](https://github.com/tauri-apps/plugins-workspace/../../alii13)) On macOS, a failed install no longer deletes the installed app. The bundles are swapped atomically where the file system supports it; otherwise the previous app is restored, or kept as `<name> (previous version).app` and reported through the new `Error::PreviousAppNotRestored`. Also fixes installing apps on a volume other than the temp directory's, and the bundle root's permissions (`0755`).
+
+## [2.13.1]
+
+- [`ecd3273e`](https://github.com/tauri-apps/plugins-workspace/commit/ecd3273e8e4c6e9b123bf9861bf7b925cad1c679) ([#3480](https://github.com/tauri-apps/plugins-workspace/pull/3480) by [@renovate](https://github.com/tauri-apps/plugins-workspace/../../renovate)) Updated `windows-rs` dependencies:
+    
+    - deep-link: updated `windows-registry` to 0.6 and `windows-result` to 0.4. The public `Error::Windows` variant wraps `windows_result::Error`; applications using this type directly should update their `windows-result` dependency.
+    - opener: updated `windows` to 0.62. The public `Error::Win32Error` variant wraps `windows::core::Error`; applications using this type directly should update their `windows` dependency.
+    - single-instance: updated `windows-sys` to 0.61
+    - updater: updated `windows-sys` to 0.61
+- [`90b9869e`](https://github.com/tauri-apps/plugins-workspace/commit/90b9869e610e7453772fa0f84f3e641ff2b36f23) ([#3573](https://github.com/tauri-apps/plugins-workspace/pull/3573) by [@renovate](https://github.com/tauri-apps/plugins-workspace/../../renovate)) Updated `dirs` to v7
+- [`22e286f3`](https://github.com/tauri-apps/plugins-workspace/commit/22e286f3121f9d79f170b7092de884ee19fb2d14) ([#3501](https://github.com/tauri-apps/plugins-workspace/pull/3501) by [@renovate](https://github.com/tauri-apps/plugins-workspace/../../renovate)) Updated dependency `infer` to 0.22
+
 ## [2.13.0]
 
 - [`ae3c808e`](https://github.com/tauri-apps/plugins-workspace/commit/ae3c808eb60086f32b1d67bb8ccc525b95333e77) ([#3602](https://github.com/tauri-apps/plugins-workspace/pull/3602)) The plugin's global API script (used with `app.withGlobalTauri`) now resolves the core API from `window.__TAURI__` instead of bundling its own copy of `@tauri-apps/api`. Values created with the core API are now accepted by plugin APIs in global mode (e.g. an `Image` from `window.__TAURI__.image` passed to `clipboardManager.writeImage`, which previously failed the `instanceof` check against the plugin's private copy), and the script is considerably smaller.
