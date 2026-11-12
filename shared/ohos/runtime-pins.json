@@ -1,7 +1,7 @@
 {
   "tauri": {
     "repository": "LeenHawk/tauri",
-    "revision": "ed12183b91ad7816193ad4f7d1f52d8d817cc675"
+    "revision": "fa796a3f31b6027dbdc3c9743affc9c8b7f01465"
   },
   "wry": {
     "repository": "LeenHawk/wry",
